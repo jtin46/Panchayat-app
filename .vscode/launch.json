@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Chrome against localhost",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8081",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Attach to Android Process",
+      "type": "kotlin",
+      "request": "attach",
+      "projectRoot": "${workspaceFolder}/app",
+      "hostName": "localhost",
+      "port": 5005
+    },
+    {
+      "name": "Debug Expo/React Native in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:19006",
+      "webRoot": "${workspaceFolder}",
+      "sourceMapPathOverrides": {
+        "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
+        "webpack:///./*": "${workspaceFolder}/*",
+        "webpack:///*": "*"
+      }
+    }
+  ]
+}
