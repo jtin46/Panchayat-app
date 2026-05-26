@@ -25,6 +25,26 @@ import java.util.UUID
 
 // --- Data Models ---
 
+data class UserSession(
+    val fullName: String,
+    val email: String,
+    val role: String, // "Secretary", "Resident", "Service Provider"
+    val serviceType: String? = null, // "Plumber", "Carpenter", "Electrician", "Painter", "Pest Control", "Security Guard", etc.
+    val societyName: String,
+    val joinCode: String,
+    val apartment: String = "",
+    val pinCodeOrLocation: String = "",
+    val wingsCount: String = ""
+)
+
+data class SocietyDetails(
+    val name: String,
+    val location: String,
+    val wings: String,
+    val code: String,
+    val creatorName: String
+)
+
 data class Ticket(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -68,6 +88,12 @@ class PanchayatViewModel(application: Application) : AndroidViewModel(applicatio
     private val context = application.applicationContext
 
     // --- State Flows ---
+    private val _currentUser = MutableStateFlow<UserSession?>(null)
+    val currentUser: StateFlow<UserSession?> = _currentUser
+
+    private val _registeredSocieties = MutableStateFlow<Map<String, SocietyDetails>>(emptyMap())
+    val registeredSocieties: StateFlow<Map<String, SocietyDetails>> = _registeredSocieties
+
     private val _tickets = MutableStateFlow<List<Ticket>>(emptyList())
     val tickets: StateFlow<List<Ticket>> = _tickets
 
@@ -141,6 +167,16 @@ class PanchayatViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun seedInitialData() {
+        _registeredSocieties.value = mapOf(
+            "PANC-999" to SocietyDetails(
+                name = "Panchayat Premium Society",
+                location = "Gokuldham Co-op, Mumbai",
+                wings = "A, B, C, D",
+                code = "PANC-999",
+                creatorName = "Sec. Bhide"
+            )
+        )
+
         // Initial Mock Notices
         _notices.value = listOf(
             Notice(
@@ -476,6 +512,104 @@ class PanchayatViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         _tickets.value = updated
+    }
+
+    // --- Authentication & Society Registration Logic ---
+
+    fun registerSocietyAndLogin(
+        fullName: String,
+        email: String,
+        societyName: String,
+        location: String,
+        wings: String
+    ): String {
+        // Generate a unique society join code
+        val randomNum = (1000..9999).random().toString()
+        val generatedCode = "PANC-$randomNum"
+        
+        val newSociety = SocietyDetails(
+            name = societyName,
+            location = location,
+            wings = wings,
+            code = generatedCode,
+            creatorName = fullName
+        )
+        
+        // Save to our master society pool
+        _registeredSocieties.value = _registeredSocieties.value + (generatedCode to newSociety)
+        
+        // Establish current active session
+        val session = UserSession(
+            fullName = fullName,
+            email = email,
+            role = "Secretary",
+            societyName = societyName,
+            joinCode = generatedCode,
+            apartment = "Office #1",
+            pinCodeOrLocation = location,
+            wingsCount = wings
+        )
+        _currentUser.value = session
+        return generatedCode
+    }
+
+    fun joinSocietyAndLogin(
+        fullName: String,
+        email: String,
+        role: String,
+        serviceType: String?,
+        joinCode: String,
+        apartmentOrDetail: String
+    ): Boolean {
+        val uppercaseCode = joinCode.uppercase().trim()
+        val society = _registeredSocieties.value[uppercaseCode] ?: return false
+        
+        val actualApartment = if (role == "Service Provider") {
+            "Partner: ${serviceType ?: "General Support"}"
+        } else {
+            apartmentOrDetail
+        }
+
+        val session = UserSession(
+            fullName = fullName,
+            email = email,
+            role = role,
+            serviceType = serviceType,
+            societyName = society.name,
+            joinCode = uppercaseCode,
+            apartment = actualApartment,
+            pinCodeOrLocation = society.location,
+            wingsCount = society.wings
+        )
+        _currentUser.value = session
+        return true
+    }
+
+    fun loginExistingUser(email: String, isGoogle: Boolean = false): Boolean {
+        val name = if (isGoogle) {
+            "Google Authorized User"
+        } else {
+            email.substringBefore("@").replaceFirstChar { it.uppercase() }
+        }
+        val defaultCode = "PANC-999"
+        val society = _registeredSocieties.value[defaultCode] ?: return false
+        
+        val session = UserSession(
+            fullName = name,
+            email = email,
+            role = "Resident",
+            societyName = society.name,
+            joinCode = defaultCode,
+            apartment = "A-304",
+            pinCodeOrLocation = society.location,
+            wingsCount = society.wings
+        )
+        _currentUser.value = session
+        return true
+    }
+
+    fun logout() {
+        _currentUser.value = null
     }
 
     override fun onCleared() {

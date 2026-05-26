@@ -63,6 +63,13 @@ fun PanchayatApp(
     viewModel: PanchayatViewModel,
     modifier: Modifier = Modifier
 ) {
+    val currentUser by viewModel.currentUser.collectAsState()
+
+    if (currentUser == null) {
+        AuthScreen(viewModel = viewModel, modifier = modifier)
+        return
+    }
+
     var currentTab by remember { mutableStateOf(PanchayatTab.DASHBOARD) }
     var isAdminMode by remember { mutableStateOf(false) }
 
@@ -141,8 +148,10 @@ fun PanchayatApp(
                     Column(modifier = Modifier.fillMaxSize()) {
                         // Brand Top Bar
                         PanchayatTopHeader(
+                            currentUser = currentUser,
                             isAdmin = false,
-                            onToggleAdmin = { isAdminMode = true }
+                            onToggleAdmin = { isAdminMode = true },
+                            onLogout = { viewModel.logout() }
                         )
 
                         Box(modifier = Modifier.weight(1f)) {
@@ -156,6 +165,7 @@ fun PanchayatApp(
                                 )
 
                                 PanchayatTab.VOICE_TICKET -> VoiceTicketScreen(
+                                    defaultApartment = currentUser?.apartment ?: "A-304",
                                     isRecording = isRecording,
                                     voiceIssueStatus = voiceIssueStatus,
                                     isProcessingAI = isProcessingAI,
@@ -203,8 +213,10 @@ fun PanchayatApp(
 // --- Custom Top Header Bar ---
 @Composable
 fun PanchayatTopHeader(
+    currentUser: com.example.viewmodel.UserSession? = null,
     isAdmin: Boolean,
-    onToggleAdmin: () -> Unit
+    onToggleAdmin: () -> Unit,
+    onLogout: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -213,64 +225,131 @@ fun PanchayatTopHeader(
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(PanchayatGreenLight)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(PanchayatGreenLight)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = currentUser?.societyName ?: "Panchayat Premium Society",
+                            fontSize = 12.sp,
+                            color = PanchayatGreenLight,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Panchayat Premium Society",
-                        fontSize = 12.sp,
-                        color = PanchayatGreenLight,
-                        fontWeight = FontWeight.Bold
+                        text = if (isAdmin) "Admin Control Core" else "Digital Resident Portal",
+                        fontSize = 20.sp,
+                        color = TextPrimaryDark,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = if (isAdmin) "Admin Control Core" else "Digital Resident Portal",
-                    fontSize = 20.sp,
-                    color = TextPrimaryDark,
-                    fontWeight = FontWeight.ExtraBold
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (currentUser == null || currentUser.role == "Secretary" || currentUser.role == "Resident") {
+                        Surface(
+                            onClick = onToggleAdmin,
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isAdmin) PanchayatOrange else DarkSurfaceElevated,
+                            modifier = Modifier
+                                .testTag("admin_mode_toggle"),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isAdmin) Icons.Default.SwitchAccount else Icons.Default.AdminPanelSettings,
+                                    contentDescription = "Switch Console",
+                                    tint = if (isAdmin) Color.White else PanchayatOrangeLight,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isAdmin) "Resident" else "Admin",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isAdmin) Color.White else PanchayatOrangeLight
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onLogout,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(DarkSurfaceElevated)
+                            .testTag("logout_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Logout and Change Society",
+                            tint = Color.Red,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
-            // Quick Admin Toggle pill
-            Surface(
-                onClick = onToggleAdmin,
-                shape = RoundedCornerShape(12.dp),
-                color = if (isAdmin) PanchayatOrange else DarkSurfaceElevated,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .testTag("admin_mode_toggle"),
-            ) {
+            currentUser?.let { user ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider(color = DarkSurfaceElevated)
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (isAdmin) Icons.Default.SwitchAccount else Icons.Default.AdminPanelSettings,
-                        contentDescription = "Switch Console",
-                        tint = if (isAdmin) Color.White else PanchayatOrangeLight,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isAdmin) "Resident View" else "Admin Board",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isAdmin) Color.White else PanchayatOrangeLight
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (user.role == "Secretary") Icons.Default.Stars else Icons.Default.Person,
+                            contentDescription = "User Icon",
+                            tint = PanchayatOrangeLight,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${user.fullName} (${user.role})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Surface(
+                        color = PanchayatOrange.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.height(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 6.dp)) {
+                            Text(
+                                text = "Code: ${user.joinCode} | Flat: ${user.apartment.take(12)}",
+                                color = PanchayatOrangeLight,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -534,6 +613,7 @@ fun NoticeItemRow(notice: Notice) {
 // --- Screen 2: AI Voice-to-Ticket Screen ---
 @Composable
 fun VoiceTicketScreen(
+    defaultApartment: String = "A-304",
     isRecording: Boolean,
     voiceIssueStatus: String?,
     isProcessingAI: Boolean,
@@ -541,7 +621,7 @@ fun VoiceTicketScreen(
     onStopRecord: (apartment: String, overrideText: String?) -> Unit,
     onManualAnalyze: (text: String, apartment: String) -> Unit
 ) {
-    var apartmentText by remember { mutableStateOf("A-304") }
+    var apartmentText by remember { mutableStateOf(defaultApartment) }
     var userManualExplainText by remember { mutableStateOf("") }
     var activeTimerSec by remember { mutableStateOf(0) }
 
