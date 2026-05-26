@@ -1,0 +1,6 @@
+{
+  "name": "Panchayat",
+  "description": "AI-powered society management app with voice tickets, marketplace, and rulebook chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
